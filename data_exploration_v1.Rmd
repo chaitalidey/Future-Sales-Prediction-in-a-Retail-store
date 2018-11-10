@@ -1,0 +1,193 @@
+---
+title: "Retail_v1"
+author: "Chaitali"
+date: "September 20, 2018"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+
+
+```{r echo=TRUE}
+
+```
+
+## Original Main Data Extraction
+# z <- as.Date(x, "%d%b%Y")
+
+```{r pressure, echo=FALSE}
+original.data<-read.csv("C:/Users/Chaitali Dey/Desktop/CKME 136/Future sale_my project_original data/all/sales_train_v2.csv", stringsAsFactors = TRUE,header=T)
+head(original.data,n=100)   #1st six row
+str(original.data)
+class(original.data)
+dim(original.data)
+original.data$date = gsub("\\.", "-", original.data$date)
+#head(original.data,n=100)
+original.data$date = as.Date(original.data$date,format="%d-%m-%y")
+class(original.data$date)
+str(original.data)
+```
+
+# Attempt to convert to Time series
+
+```{r}
+# conversion to time stamp of date column
+dateTS<-ts(original.data$date)
+head(dateTS)
+start(dateTS)
+end(dateTS)
+deltat(dateTS)
+#time(dateTS)
+#cycle(dateTS)
+```
+
+# Data Exploration- 
+# Missing values in any variable
+# No of unique items, shops,months in the dataset
+# Keep only the distinct row in data frame original.distinct
+
+```{r}
+data_missing <- data.frame(Missing_Item = sum(is.na(original.data$item_id)),
+     Missing_item_cnt_day = sum(is.na(original.data$item_cnt_day)),
+     Missing_item_price=sum(is.na(original.data$item_price)),
+      Missing_shop_id=sum(is.na(original.data$shop_id)))
+data_missing
+data.unique <- data.frame(Unique_Item_type=length(unique(original.data$item_id)),Unique_shop_type=length(unique(original.data$shop_id)),Unique_month_type=length(unique(original.data$ date_block_num)))
+data.unique
+print(paste("No of rows in original train data ",nrow(original.data)))
+original.distinct = distinct(original.data,.keep_all= TRUE)         # Keep only distinct rows
+print(paste("No of distinct rows in original train data ", nrow(original.distinct)))
+
+```
+
+
+
+
+# Sort by vector name [z] then [x]
+#  dataframe[with(dataframe, order(z, x)), ]
+#Sorting a Data Frame original.distinct by shop_id first and then  by item_id
+# No of negative item_cnt_day
+# item_cnt_day= -1 is considered as stock out situation
+
+```{r}
+#  Sort the Dataset
+orderedDistinct.Data <- original.distinct[with(original.distinct, order(shop_id,item_id,date)),]
+nrow(orderedDistinct.Data)
+
+Neg_rows <- subset(orderedDistinct.Data, item_cnt_day < 0)        # collect rows with neg item_count
+print(paste("No of negative rows in original.didtinct train data ",nrow(Neg_rows)))
+
+#glimpse(Neg_rows)
+head(orderedDistinct.Data,60)
+
+```
+
+# Data viewed in table form
+
+```{r}
+library(tibble)
+table.orderedData= as.tibble(orderedDistinct.trainData)
+View(table.orderedData)
+```
+
+
+
+#    Sorting a Data Frame by shop_id first and then  by item_id
+#    item_cnt_day= -1 is considered as stock out situation
+#   Total no of stock out per shop , month and items are shown in graph below
+
+
+```{r}
+dataNeg_shop2 = filter(ordered.Neg_rows,shop_id==2)
+nrow(dataNeg_shop2)
+# Negative sales by shop_id
+negBy_ShopId = data.frame(table(Shop_id = ordered.Neg_rows$shop_id))    
+
+barplot(negBy_ShopId$Freq,names.arg = negBy_ShopId$Shop_id,xlab = "Shop_id",ylab = "Freq")
+#Sort stock out case from lowest to heighest
+negBy_ShopId = negBy_ShopId[order(negBy_ShopId$Freq), ]; negBy_ShopId   
+# Negative sales by month
+negBy_Month = data.frame(table(month_no = ordered.Neg_rows$date_block_num))
+barplot(negBy_Month$Freq,names.arg = negBy_Month$month_no,xlab = "Month_no",ylab = "Freq")
+#negBy_Month = negBy_Month[order(negBy_Month$Freq), ];  negBy_Month
+
+# Negative sales by shop_id
+negBy_Item =data.frame(table(Item_Id = ordered.Neg_rows$date_block_num))
+barplot(negBy_Item$Freq,names.arg = negBy_Item$Item_Id,xlab = "Item_Id",ylab = "Freq")
+negBy_Item =negBy_Item[order(negBy_Item$Freq), ]; negBy_Item
+rang= range(as.numeric(negBy_Item$Item_Id))
+str(rang)
+print("range of item_id which created stockout"); rang
+
+```
+
+# study of test data given
+# Total Item type = 22169 Total shop type = 60 and by following code chunk we will see it reduced to 5100 and 42 respectively
+# we wihence work on unique key "ID" given by "test.csv" dataset. No of  unique ID = 214200 = no of rows
+
+```{r}
+test_data<-read.csv("C:/Users/Chaitali Dey/Desktop/CKME 136/Future sale_my project_original data/all/test.csv", stringsAsFactors = FALSE,header=T)
+str(test_data)
+class(test_data)
+dim(test_data)
+TestData.unique <- data.frame(Unique_ID = length(unique(test_data$ID)), Unique_Item_type=length(unique(test_data$item_id)),Unique_shop_type=length(unique(test_data$shop_id)))
+TestData.unique
+table.test_data = as.tibble(test_data)
+View(table.test_data)
+```
+
+
+```{r}
+item_data<-read.csv("C:/Users/Chaitali Dey/Desktop/CKME 136/Future sale_my project_original data/all/items.csv", stringsAsFactors = TRUE,header=T)
+head(item_data)
+str(item_data)
+class(item_data)
+dim(item_data)
+Item_type=length(unique(item_data$item_id))
+cat("unique item no = ", Item_type)
+data.frame(max_item_id= max(item_data$item_id))
+```
+
+# Item Categories
+
+```{r}
+shops_data<-read.csv("C:/Users/Chaitali Dey/Desktop/CKME 136/Future sale_my project_original data/all/shops.csv", stringsAsFactors = FALSE,header=T)
+head(shops_data)
+str(shops_data)
+class(shops_data)
+dim(shops_data)
+```
+
+```{r}
+item_categories<-read.csv("C:/Users/Chaitali Dey/Desktop/CKME 136/Future sale_my project_original data/all/item_categories.csv", stringsAsFactors = FALSE,header=T)
+head(item_categories)
+str(item_categories)
+class(item_categories)
+dim(item_categories)
+```
+
+```{r}
+sample_submission<-read.csv("C:/Users/Chaitali Dey/Desktop/CKME 136/Future sale_my project_original data/all/sample_submission.csv", stringsAsFactors = FALSE,header=T)
+head(sample_submission)
+str(sample_submission)
+class(sample_submission)
+dim(sample_submission)
+```
+
+```{r}
+str(original.data)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
