@@ -1,4 +1,6 @@
 # Future-Sales-Prediction-in-a-Retail-store
-It is a project under course CKME 136 under Certificate program on Data Analytics,Big Data and Predictive Analytics
-all.zip cotains six(6) files--sales_train_v2.csv, test.csv, sample_submission.csv, item_categories.csv, items.csv  and shops.csv 
+It is a project under course CKME 136 under Certificate program on Data Analytics,Big Data and Predictive Analytics.  
+
+"all.zip" cotains six(6) files - sales_train_v2.csv, test.csv, sample_submission.csv, item_categories.csv, items.csv  and shops.csv 
+
 sales_train_v2.csv is the main data file which has been imported and modified as dataframe in accordance to the given test data set which provided unique ID formed with the combinatio of item_id and shop_id. For our analysis three given files item_categories.csv, items.csv  and shops.csv were found unnessary except for some initial basic exploration.
