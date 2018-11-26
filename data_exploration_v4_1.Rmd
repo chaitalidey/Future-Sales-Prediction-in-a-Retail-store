@@ -1,0 +1,561 @@
+---
+title: "Retail_v1"
+author: "Chaitali"
+date: "September 20, 2018"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+
+
+#  No. 1
+## Original Main Data Extraction---all based on this file  "sales_train_v2.csv"
+# str( ), Start end date,  head()  ,tail()
+#   char(date) to date(date) conversion
+# z <- as.Date(x, "%d%b%Y")
+
+```{r pressure, echo=FALSE}
+library(lubridate)
+library(dplyr)
+library(ggplot2)
+library(purrr)
+library(tibble)
+library(tidyr)
+
+original.data<-read.csv("C:/Users/Titli/Desktop/CKME 136/Data_CKME136_MyProject/Future sale_my project_original data/all/sales_train_v2.csv", stringsAsFactors = TRUE,header=T)
+head(original.data,n=100)   #1st six row
+str(original.data)
+class(original.data)
+dim(original.data)
+original.data$date = gsub("\\.", "-", original.data$date)
+original.data$date = as.factor(original.data$date)
+head(original.data,n=100)
+original.data$date = as.Date(original.data$date, format = "%d-%m-%Y")
+head(original.data,n=100)
+class(original.data$date)
+str(original.data)
+Max_Min_Dates <- data.frame(StartDate = min(original.data$date),EndDate= max(original.data$date))
+Max_Min_Dates
+Max_Min_Dates$EndDate-Max_Min_Dates$StartDate +1
+```
+
+
+
+#  No. 2
+# Data Exploration- 
+# If any missing values in any variable---- missing case-------complete case
+# Cheque the No of unique items, shops,months in the dataset
+# Keep only the distinct row in data frame original.distinct
+
+```{r}
+data_missing <- data.frame(Missing_Item = sum(is.na(original.data$item_id)),
+     Missing_item_cnt_day = sum(is.na(original.data$item_cnt_day)),
+     Missing_item_price=sum(is.na(original.data$item_price)),
+      Missing_shop_id=sum(is.na(original.data$shop_id)))
+data_missing
+data.unique <- data.frame(Uniq_No_of_Days=length(unique(original.data$date)) ,Unique_Item_type=length(unique(original.data$item_id)),Unique_shop_type=length(unique(original.data$shop_id)),Unique_month_type=length(unique(original.data$ date_block_num)))
+data.unique
+print(paste("No of rows in original train data ",nrow(original.data)))
+original.distinct = distinct(original.data,.keep_all= TRUE)         # Keep only distinct rows
+print(paste("No of distinct rows in original train data ", nrow(original.distinct)))
+
+```
+
+
+
+#  No. 3
+
+# Sort by vector  shop_id,item_id,date  --------------just exploratort
+#  dataframe[with(dataframe, order(z, x)), ]
+#Sorting a Data Frame original.distinct by shop_id first and then  by item_id
+# No of negative item_cnt_day
+# item_cnt_day= -1 is considered as stock out situation
+
+```{r}
+#  Sort the Dataset
+orderedDistinct.Data <- original.distinct[with(original.distinct, order(shop_id,item_id,date)),]
+nrow(orderedDistinct.Data)
+
+Neg_rows <- subset(orderedDistinct.Data, item_cnt_day < 0)        # collect rows with neg item_count
+print(paste("No of negative rows in ordered  Distinct train data ",nrow(Neg_rows)))
+
+head(orderedDistinct.Data,60)
+```
+
+#  No. 4
+# Data  "table.orderedData" viewed in table form  
+
+```{r}
+
+#table.orderedData= as.tibble(orderedDistinct.Data)
+#View(table.orderedData)
+```
+
+
+
+#  No. 5
+#    Extracting negative sales values (Data Frame)stock out) by shop_id / item_id / month
+#    item_cnt_day= -1 or less ( <0) is considered as stock out situation
+#   Total no of stock out per shop , month and items are shown in graph below
+
+
+```{r}
+#dataNeg_shop2 = filter(Neg_rows, shop_id == 2)
+#nrow(dataNeg_shop2)
+# Negative sales by shop_id
+negBy_ShopId = data.frame(table(Shop_id = Neg_rows$shop_id))    
+
+barplot(negBy_ShopId$Freq,names.arg = negBy_ShopId$Shop_id,xlab = "Shop_id",ylab = "Freq",main="Freq of -ve value per shop")
+#Sort stock out case from lowest to heighest
+negBy_ShopId = negBy_ShopId[order(negBy_ShopId$Freq), ]; negBy_ShopId   
+# Negative sales by month
+negBy_Month = data.frame(table(month_no = Neg_rows$date_block_num))
+barplot(negBy_Month$Freq,names.arg = negBy_Month$month_no,xlab = "Month_no",ylab = "Freq",main="Freq of -ve value per month")
+#negBy_Month = negBy_Month[order(negBy_Month$Freq), ];  negBy_Month
+
+# Negative sales by shop_id
+negBy_Item =data.frame(table(Item_Id = Neg_rows$item_id))
+str(negBy_Item)
+barplot(negBy_Item$Freq,names.arg = negBy_Item$Item_Id,xlab = "Item_Id",ylab = "Freq",main="Freq of -ve value per Item ")
+negBy_Item =negBy_Item[order(negBy_Item$Freq), ]; negBy_Item
+# Find which Item has maxm stockout occurance
+Max_neg_Freq_item = negBy_Item %>% filter(Freq==max(Freq))
+Max_neg_Freq_item
+#paste("Item which has maxm stock out=",Max_neg_Freq_item)
+rang= range(as.numeric(negBy_Item$Item_Id))
+str(rang)
+print("range of item_id which created stockout"); rang
+
+```
+
+#  No. 6
+
+# study of test data file given--- "test.csv" --here new identification column "ID" given which is formed in combination of "ShopId" and "item_id"
+# Final forecasting of one month ie  Nov-2015 is required to be presented through file "sample_submission.csv"
+# Total Item type = 22169 Total shop type = 60 and by following code chunk we will see it reduced to 5100 and 42 respectively
+# we will work on unique key "ID" given by "test.csv" dataset. No of  unique ID = 214200 = no of rows
+
+```{r}
+test_data<-read.csv("C:/Users/Titli/Desktop/CKME 136/Data_CKME136_MyProject/Future sale_my project_original data/all/test.csv", stringsAsFactors = FALSE,header=T)
+str(test_data)
+class(test_data)
+dim(test_data)
+TestData.unique <- data.frame(Unique_ID = length(unique(test_data$ID)), Unique_Item_type=length(unique(test_data$item_id)),Unique_shop_type=length(unique(test_data$shop_id)))
+TestData.unique
+table.test_data = as.tibble(test_data)
+#View(table.test_data)
+```
+
+#  No. 7
+# Left join test_data with orderedDistinct.Data By multi column keys shop_id and item_id
+# reast exploratory
+# convert "item_cnt_day" from double to integer value
+# Examine and check rows of  new dataframe with missing data  or how many complete cases are there 
+# Eliminate rows/ID values which have missing data and form new dataframe  "complete_dfV1" ---but later we worked with fulldata set by imputing miissing date by start date and missing item_cnt_day by 0
+# Neg value means that item was asked for purchase but was not sold for stock out. Some item 
+
+```{r}
+#  Left Join
+
+New_Joined_DataV1 = left_join(test_data, orderedDistinct.Data, by = c("shop_id","item_id"))
+
+# unique identification values in different data frames extracted in "df1"
+
+df1=data.frame(Unique_test_data_ID=length(unique(test_data$ID)),Uniqu_Joined_Data_ID=length(unique(New_Joined_DataV1$ID)),row.names =c("No of Unique ID"))
+#str(New_Joined_DataV1)
+df1
+#    as.integer(New_Joined_DataV1$item_cnt_day)
+New_Joined_DataV1$item_cnt_day <- as.integer(New_Joined_DataV1$item_cnt_day)
+
+#  view   New_Joined_DataV1
+# View(New_Joined_DataV1)
+
+# dataframe with missing rows and view their ID values 
+miss_dfV1=New_Joined_DataV1[!complete.cases(New_Joined_DataV1), ]
+
+# Main data with complete cases
+
+completeCase_dfV1=New_Joined_DataV1[complete.cases(New_Joined_DataV1), ]      #  complete case df     not reqd in future
+
+# Extract ngative count value
+JoinedData_Neg_rows <- subset(completeCase_dfV1, item_cnt_day < 0)              # collect rows with neg item_count    not reqd in future
+
+#View(JoinedData_Neg_rows)
+paste(" max no of times item was asked for purchase but had stock out  =", min(JoinedData_Neg_rows$item_cnt_day))
+
+#  mam negative item_cnt_day vlue ID wise
+df.agg <- aggregate( ID~item_cnt_day , JoinedData_Neg_rows, min)
+
+df.agg
+
+# Summary table 
+
+df2 =data.frame(TrainSet= dim(orderedDistinct.Data),Test_Data =dim(table.test_data),Joined_dataset=dim(New_Joined_DataV1),Missing_dataset=dim(miss_dfV1),CompleteCase_dataset=dim(completeCase_dfV1),Neg_count_Sales_Value=dim(JoinedData_Neg_rows),row.names =c("Total row","Total cols")) 
+df2
+
+# No of Negative sales occurred per "ID" and view graphically
+
+Freq_negBy_ID = data.frame(table(ID =JoinedData_Neg_rows$ID)) 
+barplot(Freq_negBy_ID$Freq,names.arg = Freq_negBy_ID$ID,xlab = "ID values",ylab = "Freq",main="Freq of -ve value per ID")
+
+#Sort Frequency of stock out case from lowest to heighest
+
+Freq_negBy_ID = Freq_negBy_ID[order(Freq_negBy_ID$Freq), ]
+
+# No of stock out condition occurred by count in Freq_negBy_ID 
+Freq_factor=factor(Freq_negBy_ID$Freq);  
+No_of_Occurance_Neg <- as.data.frame(table(Freq_factor))
+
+# ID which has maximum occurance of negative value 
+print(paste(" Maximum frequency of occurance of stock out per ID basis ",max(Freq_negBy_ID$Freq)))
+
+
+```
+
+
+
+```{r}
+x = 1034 * 214200
+x
+```
+
+
+
+
+#  No. 8
+ 
+# Remove unwanted attributes except columns ID, date and item_cnt_day and form dataframe "New_Joined_DataV2"" 
+#  It is a univariate time series data
+# complete cases with NA value in New_Joined_DataV2 by( i.e ID s for which there were no data in "sales_train_v2.csv") :    
+# Put    date = start date   and   item_cnt_day= 0
+#   convert negative item_cnt_day to positive considering if there was item in stock that many items were sold  ( as item_cnt_day < -1 several time)
+# some exploration of data after NA removal
+
+
+```{r}
+#detach("package:plyr", unload=TRUE)   # to avoid conflict between dplyr and plyr
+
+# Main data with complete cases  completeCase_dfV1
+#  nrow()  should be  1327230	
+
+str(New_Joined_DataV1)
+
+New_Joined_DataV2 = New_Joined_DataV1[,c("ID","date","item_cnt_day")]
+#str(New_Joined_DataV2)
+#str(Max_Min_Dates)
+
+#  calculate the span of time series date
+
+diff1 = Max_Min_Dates$EndDate - Max_Min_Dates$StartDate + 1
+diff1
+
+# create StartDate and EndDate variables
+StartDate = Max_Min_Dates$StartDate
+EndDate= Max_Min_Dates$EndDate
+
+
+# To complete the joined data set , provide values to missing date and item_cnt_day of  New_Joined_DataV2 
+
+New_Joined_DataV2$item_cnt_day[is.na(New_Joined_DataV2$item_cnt_day)] <- 0
+
+New_Joined_DataV2$date[is.na(New_Joined_DataV2$date)] <- Max_Min_Dates$StartDate
+str( New_Joined_DataV2)
+miss_dfV1=New_Joined_DataV2[!complete.cases(New_Joined_DataV2), ]  
+paste("Missing case is now ",nrow(miss_dfV1))
+
+
+New_Joined_DataV2$item_cnt_day <- as.integer(New_Joined_DataV2$item_cnt_day)
+
+JoinedData_Neg_rows_ifany <- subset(New_Joined_DataV2, item_cnt_day < 0)        # collect rows with neg item_count
+paste("Total negatine item_cnt_day value before change is  ",nrow(JoinedData_Neg_rows_ifany))
+
+#   convert negative item_cnt_day to positive
+
+Neg_to_pos <- function(x)  {
+  ncol1 =length(x)
+  for (i in 1:ncol1)   {
+  if( x[i]<0)
+    {   x[i] = -x[i]  }
+  }
+  return(x)
+}
+New_Joined_DataV2$item_cnt_day <- sapply(New_Joined_DataV2$item_cnt_day,Neg_to_pos)
+
+str(New_Joined_DataV2)
+
+JoinedData_Neg_rows <- subset(New_Joined_DataV2, item_cnt_day < 0)
+
+paste("No of -ve item_cnt_day is now ",nrow(JoinedData_Neg_rows ))
+
+New_Joined_DataV2[ New_Joined_DataV2$item_cnt_day == 16, ]  
+
+#View(w_Joined_DataV2)
+
+```
+
+
+#  No. 9
+# poulate date column with missing dates and fill missing item_cnt_day data with 0
+# After populating Total rows =  1034(total days) * 214200 (total ID's) = 221482800 but I got 221482807
+# ignore following comment lines
+#  one mismatch I found----*** ID= 214200 ;  date = 1034 ; tolal row = 1034 * 214200= 221482800  (should be)
+#   https://blog.exploratory.io/populating-missing-dates-with-complete-and-fill-functions-in-r-and-exploratory-79f2a321e6b5
+#  
+#  You can also choose to fill in missing values
+#  df %>% complete(group, nesting(item_id, item_name), fill = list(value1 = 0,value2=1))
+
+```{r}
+# Populate the date columns of each iD values and fill missing item_cnt_day by 0
+
+New_Joined_Data_complete <- data.frame(New_Joined_DataV2 %>% complete(ID, nesting(date), fill = list(item_cnt_day = 0)))
+nrow(New_Joined_Data_complete)
+
+print(paste("Min ID value = ",min(New_Joined_Data_complete$ID),", Max ID value = ",max(New_Joined_Data_complete$ID),", No of unique ID = ",length(unique(New_Joined_Data_complete$ID))))
+
+print(paste("Unique no of days = ",length(unique(New_Joined_Data_complete$date))))
+#View(New_Joined_Data_complete)
+
+```
+
+# No 9.1
+# saving complete data to a csv file for extraction data later to save time
+# ----- but could not save/create file  "New_Joined_Data_complete.csv
+
+```{r}
+#library(xcms)
+#gc()
+#write.csv(New_Joined_Data_complete, file = "C:/Users/Titli/Desktop/CKME 136/Data_CKME136_MyProject/Future sale_my project_original data/all/New_Joined_Data_complete.csv")
+```
+
+#  No. 10
+# sample submission file extract from  "sample_submission.csv"
+
+```{r}
+sample_submission<-read.csv("C:/Users/Titli/Desktop/CKME 136/Data_CKME136_MyProject/Future sale_my project_original data/all/sample_submission.csv", stringsAsFactors = FALSE,header=T)
+sample_submit_Proto<-read.csv("C:/Users/Titli/Desktop/CKME 136/Data_CKME136_MyProject/Future sale_my project_original data/all/sample_submission.csv", stringsAsFactors = FALSE,header=T)
+head(sample_submission)
+str(sample_submission)
+str(sample_submit_Proto)
+class(sample_submission)
+dim(sample_submission)
+```
+
+
+# No. 11
+
+# subset rows with heighest sales value (item_cnt_day) in one day 
+# Summarize by no of days items sold by ID in "New_Joined_Data_complete_summarize_Sales "
+# Summarize no of days items sold by ID >> by count    in "New_Joined_Data_complete_summarize_Sales_ordered "
+#   Left join
+Max_neg_Freq_item = negBy_Item %>% filter(Freq==max(Freq))
+Max_neg_Freq_item
+
+
+```{r}
+#print     df_ID_First_10
+
+str(New_Joined_Data_complete)
+
+Mx1 = which.max(New_Joined_Data_complete$item_cnt_day)
+New_Joined_Data_complete[Mx1,]
+# Summarize by no of days items sold by ID 
+New_Joined_Data_complete_summarize_Sales = as.data.frame(New_Joined_Data_complete %>% group_by(ID) %>% summarise(sum_no_days_sold=sum(item_cnt_day)))
+str(New_Joined_Data_complete_summarize_Sales)
+
+# Order by 
+New_Joined_Data_complete_summarize_Sales_ordered = as.data.frame(New_Joined_Data_complete_summarize_Sales %>%  arrange(sum_no_days_sold))
+View(New_Joined_Data_complete_summarize_Sales_ordered)
+
+#  Order by no_of_days_sold
+Summarize_by_Entry_nos  = as.data.frame(New_Joined_Data_complete_summarize_Sales_ordered %>%  group_by(sum_no_days_sold) %>% summarise(no_of_IDs= n()))
+View(Summarize_by_Entry_nos)
+
+ 
+#     subset  by sum_no_days_sold = 0    > >next>>  Rename column name from "sum_no_days_sold" to "item_cnt_month"  >> nrow = 102796
+New_Joined_Data_complete_no_sales = subset(New_Joined_Data_complete_summarize_Sales_ordered,sum_no_days_sold == 0)
+nrow(New_Joined_Data_complete_no_sales)
+New_Joined_Data_complete_no_sales <- rename(New_Joined_Data_complete_no_sales, item_cnt_month = sum_no_days_sold )
+str(New_Joined_Data_complete_no_sales)
+
+# Make  item_cnt_month= 0 (i.e which has no sales data)  in "sample_submit_Proto" by Left Join
+#  Left Join
+#sample_submit_Proto = merge(sample_submit_Proto, New_Joined_Data_complete_summarize_Sales, by = "ID")
+head(sample_submit_Proto)
+sample_submit_Proto = as.data.frame(left_join(sample_submit_Proto, New_Joined_Data_complete_summarize_Sales, by = c("ID")))
+                                    
+str(sample_submit_Proto)
+#sample_submit_Proto = sample_submit_Proto[c(1,2,9)]
+#str(sample_submit_Proto)
+View(sample_submit_Proto)
+
+
+```
+
+
+
+
+#  No. 12
+#   Step-by-Step Graphic Guide to Forecasting through ARIMA 
+#   http://ucanalytics.com/blogs/step-by-step-graphic-guide-to-forecasting-through-arima-modeling-in-r-manufacturing-case-study-example/
+
+# Attempt to convert to Time series per ID
+#   Note*****   each item is showing
+#   Description   https://datascienceplus.com/time-series-analysis-using-arima-model-in-r/
+#   code          https://github.com/SubhasreeUC/Master/blob/master/TimeSeriesExample.R
+# 2nd site   https://analyticsbuddhu.com/2017/02/24/how-to-make-arima-models-in-time-series-using-r/
+# 3rd site  https://www.kaggle.com/szrlee/time-series-analysis-arima-basic-model  
+#  for(symbol in 2:noCol) {
+  
+  # The ts function of R helps us to
+  # construct a time series
+  
+  data = ts(spread.data[,symbol],start=c(2013, 1), end=c(2015, 10),frequency = 12)
+  plot(ts(MonthlyCloses[ , symbol],
+         start=c(1995, 1), end=c(2014, 12),
+         frequency=12),
+       main=paste("Monthly Movements for:", 
+                  colnames(ID)[symbol]),
+       xlab="Year", ylab="item_cnt_day",
+       col="navy")
+}
+
+```{r}
+#  Libraries related with ARIMA
+library(fUnitRoots)
+library(lmtest)
+library(forecast)
+library(FitAR)
+
+# subsetting by ID
+
+df_ID_0 <- subset(New_Joined_Data_complete,New_Joined_Data_complete$ID > 20 & New_Joined_Data_complete$ID <= 29)
+
+# spread.data <- spread(New_Joined_Data_complete,ID,item_cnt_day)
+spread.data <- spread(df_ID_0,ID,item_cnt_day)
+head(spread.data)
+str(spread.data)
+sum(as.integer(is.na(spread.data)))
+
+#  First few rows of New_Joined_Data_complete
+#head(New_Joined_Data_complete)
+#str(New_Joined_Data_complete)
+
+# Find total no of cols in spread data
+
+noCol=ncol(spread.data)
+
+paste("sum= ",sum(spread.data[,4]))
+for(symbol in 2:noCol) {
+  
+  # The ts function of R helps us to
+  # construct a time series
+  
+  if (sum(spread.data[,symbol]== 0))
+      {  sample_submission$item_cnt_month[symbol] = 0
+         paste("value entered for: ID ", symbol,"=",sample_submission$ID[symbol+1])
+  }
+      
+  data = ts(spread.data[,symbol],start=c(2013,1), end=c(2015, 10),frequency = 12)
+  plot(data, main=paste("Monthly Movements for: ID ", colnames(spread.data[symbol])),
+                              xlab="Year", ylab="item_cnt_day",    col="navy")
+  
+       components.df_ID_0_Ts = decompose(data )
+       plot(components.df_ID_0_Ts,xlab=paste("ID=",colnames(spread.data[symbol])))
+}
+
+#data = ts(spread.data[,2],start=c(2013, 1), end=c(2015, 10),frequency = 12)
+#plot(data, xlab='Years', ylab = 'ID Sales')
+#components.df_ID_0_Ts = decompose(data )
+#plot(components.df_ID_0_Ts)
+
+
+# conversion to timestamp
+#df_ID_0_Ts <-ts(df_ID_0$item_cnt_day, start=c(2013, 1), end=c(2015, 10), frequency=12)
+#start(df_ID_0_Ts)
+#end(df_ID_0_Ts)
+#frequency(df_ID_0_Ts)
+#deltat(df_ID_0_Ts)
+#df_ID_0_Ts2 <- window(df_ID_0_Ts, start=c(2013, 1), end=c(2015, 10))
+#str(df_ID_0_Ts)
+# Find the components of time series
+#omponents.df_ID_0_Ts  = decompose(df_ID_0_Ts )
+#components.ts = decompose(tsData)
+
+#plot(omponents.df_ID_0_Ts)
+
+
+```
+
+
+```{r}
+library(xts)
+ts <- xts(temp$amount, as.Date(temp$date, "%Y-%m-%d"))
+
+# convert daily data
+ts_m = apply.monthly(ts, FUN)
+ts_y = apply.yearly(ts, FUN)
+ts_q = apply.quarterly(ts, FUN)
+
+df_ID_0 <- subset(New_Joined_Data_complete, New_Joined_Data_complete$ID == 29)
+
+```
+
+# spread the data set
+#   spread.data <- gather.data %>% spread(flavors, price)
+```{r}
+head(New_Joined_Data_complete)
+spread.data <- spread(New_Joined_Data_complete,ID,item_cnt_day)
+#ncol(spread.data)
+nrow(spread.data)
+```
+
+
+# # Plot the time series for each stock
+#  https://rstudio-pubs-static.s3.amazonaws.com/117451_51ea5ccf882842b49d3a7a940f27e0b4.html
+
+for(symbol in 2:numStocks + 1) {
+  
+  # The ts function of R helps us to
+  # construct a time series
+  plot(ts(MonthlyCloses[ , symbol],
+          start=c(1995, 1), end=c(2014, 12),
+          frequency=12),
+       main=paste("Monthly Movements for:", 
+                  colnames(MonthlyCloses)[symbol]),
+       xlab="Year", ylab="Stock Price in INR",
+       col="navy")
+}
+  
+```{r}
+# # Plot the time series for each stock
+
+for(symbol in 2:numStocks + 1) {
+  
+  # The ts function of R helps us to
+  # construct a time series
+  plot(ts(MonthlyCloses[ , symbol],
+          start=c(1995, 1), end=c(2014, 12),
+          frequency=12),
+       main=paste("Monthly Movements for:", 
+                  colnames(MonthlyCloses)[symbol]),
+       xlab="Year", ylab="Stock Price in INR",
+       col="navy")
+}
+```
+
+
+
+
+
